@@ -19,10 +19,13 @@ public class main {
         // Create a NeedlemanWunsch object
         // Strand1 = CGUCC 
         // Strand2 = GCCC
-        // Match = 5
-        // Mismatch = -3
-        // Indel = -5
+        // Match = 1
+        // Mismatch = -1
+        // Indel = -1
         // Allow mismatching
+        int t1 = 9;
+        int t2 = 8;
+        System.out.println(t2 / t1);
         NeedlemanWunsch n1 = new NeedlemanWunsch("AATACT", "ATTCT", 1, -1, -1, true);
 //        NeedlemanWunsch n1 = new NeedlemanWunsch("AATACT", "ATTCT", 1, -1, -1, true);
         // Print out the information
@@ -32,8 +35,8 @@ public class main {
         // Strand1 = CGUCC
         // Strand2 = GCCC
         // Do notn allow mismatching
-        NeedlemanWunsch n2 = new NeedlemanWunsch("CGUCC", "GCCC", false);
-        n2.printStrandInfo();
+//        NeedlemanWunsch n2 = new NeedlemanWunsch("CGUCC", "GCCC", false);
+//        n2.printStrandInfo();
     }
 
 }
