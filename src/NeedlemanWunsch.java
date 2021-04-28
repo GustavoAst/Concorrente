@@ -1,6 +1,10 @@
 
 import java.lang.Math;
 import java.lang.Thread;
+import java.util.Arrays;
+import java.util.concurrent.Semaphore;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -22,45 +26,77 @@ public class NeedlemanWunsch {
 
     // Solution matrix, score, and alignedStrings to be calculated
     private int[][] solution;
+    // cria uma matriz espelho ao da solução com falso nas posições
+    private Semaphore[][] mutex;
     private int score;
     private int threads;
     private String[] alignedStrands;
 
-    /**
-     * Constructor taking in two strands. Default values: MATCH = 1 MISMATCH =
-     * -1 GAP = -1 allowMismatch = true
-     *
-     * @param string1 the first strand
-     * @param string2 the second strand
-     */
-    public NeedlemanWunsch(String string1, String string2) {
-        this(string1, string2, 1, -1, -1, true);
+    private class ThreadSemaphoro extends Thread {
+
+        // i representa cada linha da matriz, por isso ele é fixado dentro dessa classe, pois cada thread irá preencher uma linha
+        private final int i;
+
+        public ThreadSemaphoro(int i) {
+            this.i = i;
+        }
+
+        @Override
+        public void run() {
+            preencheMatriz(i);
+        }
     }
 
-    /**
-     * Constructor taking in two strands and whether mismatching is allowed.
-     * Default values: MATCH = 1 MISMATCH = -1 / -999 GAP = -1
-     *
-     * @param string1 the first strand
-     * @param string2 the second strand
-     * @param allowMismatch whether mismatching is allowed
-     */
-    public NeedlemanWunsch(String string1, String string2, boolean allowMismatch) {
-        this(string1, string2, 1, allowMismatch ? -1 : -999, -1, allowMismatch);
+    public void preencheMatriz(int i) {
+        for (int j = 1; j < this.string2.length() + 1; j++) {
+            this.mutex[i][j] = new Semaphore(0);
+        }
     }
 
-    /**
-     * Constructor taking in two strands and the scoring system. Default values:
-     * allowedMismatch = true
-     *
-     * @param string1 the first strand
-     * @param string2 the second strand
-     * @param match the value of a match
-     * @param mismatch the value of a mismatch
-     * @param gap the value of an gap
-     */
-    public NeedlemanWunsch(String string1, String string2, int match, int mismatch, int gap) {
-        this(string1, string2, match, mismatch, gap, true);
+    private class ThreadSolution extends Thread {
+
+        // i representa cada linha da matriz, por isso ele é fixado dentro dessa classe, pois cada thread irá preencher uma linha
+        private final int i;
+
+        public ThreadSolution(int i) {
+            this.i = i;
+        }
+
+        @Override
+        public void run() {
+            try {
+                findSolution(i);
+            } catch (InterruptedException ex) {
+                Logger.getLogger(NeedlemanWunsch.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
+
+    public void findSolution(int i) throws InterruptedException {
+        for (int j = 1; j < this.string2.length() + 1; j++) {
+            int matchValue;
+
+            // If the characters that correspond to the grid position are equal for both strands
+            // Set the matchValue to MATCH, else set the matchValue to MISMATCH
+            if (string1.charAt(i - 1) == string2.charAt(j - 1)) {
+                matchValue = MATCH;
+            } else {
+                matchValue = MISMATCH;
+            }
+
+            // Set the value to the maximum of these three values
+            // Position to the left + GAP
+            // Position above + GAP
+            // Position top-left + matchVALUE
+            this.mutex[i][j - 1].acquire();
+            this.mutex[i - 1][j].acquire();
+            this.mutex[i - 1][j - 1].acquire();
+            this.solution[i][j] = max(this.solution[i][j - 1] + GAP, this.solution[i - 1][j] + GAP, this.solution[i - 1][j - 1] + matchValue);
+            this.mutex[i][j - 1].release();
+            this.mutex[i - 1][j].release();
+            this.mutex[i - 1][j - 1].release();
+            this.mutex[i][j].release();
+        }
     }
 
     /**
@@ -115,11 +151,57 @@ public class NeedlemanWunsch {
         this.allowMismatch = allowMismatch;
 
         this.threads = threads;
+        this.mutex = new Semaphore[string1.length() + 1][string2.length() + 1];
 
         // Calculate solution matrix
-        this.solution = findSolutionWithThreads();
+        findSolutionWithThreads();
         // Calculate score
-        this.score = solution[solution.length - 1][solution[0].length - 1];
+        this.score = getScoreFinal();
+    }
+
+    private int getScoreFinal() {
+        return solution[solution.length - 1][solution[0].length - 1];
+    }
+
+    public void findSolutionWithThreads() {
+
+        // Generate solution matrix based on lengths of both strings
+        this.solution = new int[string1.length() + 1][string2.length() + 1];
+
+        // Set the starting point to value of 0
+        this.solution[0][0] = 0;
+        this.mutex[0][0] = new Semaphore(1);
+
+        // inicialização das linhas e colunas iniciais e colocando o semaphoro com 1 permissão disponível para quem for calculado
+        for (int i = 1; i < string2.length() + 1; i++) {
+            this.solution[0][i] = this.solution[0][i - 1] + GAP;
+            this.mutex[0][i] = new Semaphore(1);;
+        }
+        for (int i = 1; i < string1.length() + 1; i++) {
+            this.solution[i][0] = this.solution[i - 1][0] + GAP;
+            this.mutex[i][0] = new Semaphore(1);;
+        }
+
+//        inicializa o resto da matriz com new Semaphoro(0) pois não foram calculados ainda usando threads
+        for (int i = 1; i < this.string1.length() + 1; i++) { // for percorrendo as linhas da matriz
+            new ThreadSemaphoro(i) {
+            }.start();
+        }
+
+        int linhaAtual = 1;
+
+        while (linhaAtual < this.string1.length() + 1) {
+            for (int i = 1; i < this.threads; i++) {
+                if (linhaAtual == this.string1.length() + 1) {
+                    break;
+                }
+                new ThreadSolution(linhaAtual) {
+                }.start();
+                linhaAtual++;
+            }
+        }
+
+        this.score = this.solution[this.solution[0].length - 1][this.solution[0].length - 1];
     }
 
     /**
@@ -173,66 +255,6 @@ public class NeedlemanWunsch {
         return solution;
     }
 
-    public int[][] findSolutionWithThreads() {
-        int[] threadIndex = new int[this.threads];
-        int valor = this.string1.length() / this.threads;
-        if (valor == 0) {
-            valor = 1;
-        }
-        for (int i = 0; i < this.threads; i++) {
-
-        }
-
-        for (int i = 0; i < this.threads; i++) {
-            new Thread() {
-                @Override
-                public void run() {
-
-                }
-            }.start();
-        }
-        // Generate solution matrix based on lengths of both strands
-        // Let string1 be the side strand
-        // Let string2 be the top strand
-        int[][] solution = new int[string1.length() + 1][string2.length() + 1];
-
-        // Set the starting point to value of 0
-        solution[0][0] = 0;
-
-        // inicialização das linhas e colunas iniciais
-        for (int i = 1; i < string2.length() + 1; i++) {
-            solution[0][i] = solution[0][i - 1] + GAP;
-        }
-        for (int i = 1; i < string1.length() + 1; i++) {
-            solution[i][0] = solution[i - 1][0] + GAP;
-        }
-
-        // Preencher a matriz com a utilização de threads
-        for (int i = 1; i < string1.length() + 1; i++) {
-            for (int j = 1; j < string2.length() + 1; j++) {
-
-                int matchValue;
-
-                // If the characters that correspond to the grid position are equal for both strands
-                // Set the matchValue to MATCH, else set the matchValue to MISMATCH
-                if (string1.charAt(i - 1) == string2.charAt(j - 1)) {
-                    matchValue = MATCH;
-                } else {
-                    matchValue = MISMATCH;
-                }
-
-                // Set the value to the maximum of these three values
-                // Position to the left + GAP
-                // Position above + GAP
-                // Position top-left + matchVALUE
-                solution[i][j] = max(solution[i][j - 1] + GAP, solution[i - 1][j] + GAP, solution[i - 1][j - 1] + matchValue);
-            }
-        }
-
-        // Return solution matrix
-        return solution;
-    }
-
     /**
      * Helper method for calculating a maximum of three numbers.
      *
@@ -247,12 +269,9 @@ public class NeedlemanWunsch {
      * strands and alignment score.
      */
     public void printStrandInfo() {
-        // Print out side strand
-//        System.out.println(alignedStrands[0]);
-        // Print out top strand
-//        System.out.println(alignedStrands[1]);
         // Print out strand score
-        System.out.println("The score for this alignment is: " + score);
+        System.out.println("teste: " + solution[solution.length - 1][solution[0].length - 1]);
+        System.out.println("The score for this alignment is: " + this.score);
     }
 
     /**
