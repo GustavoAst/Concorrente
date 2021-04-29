@@ -35,7 +35,7 @@ public class main {
 //        NeedlemanWunsch n1 = new NeedlemanWunsch("AATACT", "ATTCT", 1, -1, -1, true);
         
 //        versão do teste com 10000 caracteres e com threads
-        NeedlemanWunsch n1 = new NeedlemanWunsch(string1, string2, 1, -1, -1, true, 10);
+        NeedlemanWunsch n1 = new NeedlemanWunsch(string1, string2, 1, -1, -1, true, 50);
 
 //        versão do teste com 10000 caracteres sequencial
 //        NeedlemanWunsch n1 = new NeedlemanWunsch(string1, string2, 1, -1, -1, true);

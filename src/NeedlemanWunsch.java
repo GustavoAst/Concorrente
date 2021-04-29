@@ -44,7 +44,6 @@ public class NeedlemanWunsch {
         @Override
         public void run() {
             preencheMatriz(i);
-            ThreadSemaphoro.currentThread().stop();
         }
     }
 
@@ -67,7 +66,6 @@ public class NeedlemanWunsch {
         public void run() {
             try {
                 findSolution(i);
-                ThreadSolution.currentThread().stop();
             } catch (InterruptedException ex) {
                 Logger.getLogger(NeedlemanWunsch.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -184,14 +182,10 @@ public class NeedlemanWunsch {
             this.mutex[i][0] = new Semaphore(1);;
         }
 
-//        Semaphore teste[] = new Semaphore[100];
-//        for (int i = 0; i < teste.length + 1; i++) {
-//            teste[i] = new Semaphore(0);
-//        }
-
 //        inicializa o resto da matriz com new Semaphoro(0) pois não foram calculados ainda usando threads
         int linhaAtual = 1;
         while (linhaAtual < this.string1.length() + 1) {
+            System.out.println("Linha1: " + linhaAtual);
             if (this.mutex[linhaAtual - 1][this.string2.length() - 1] != null) {
                 for (int i = 0; i < this.threads; i++) { // for percorrendo as linhas da matriz
                     new ThreadSemaphoro(linhaAtual) {
@@ -204,6 +198,7 @@ public class NeedlemanWunsch {
         linhaAtual = 1;
 
         while (linhaAtual < this.string1.length() + 1) {
+            System.out.println("Linha2: " + linhaAtual);
             for (int i = 0; i < this.threads; i++) {
                 if (linhaAtual == this.string1.length() + 1) {
                     break;
@@ -212,9 +207,10 @@ public class NeedlemanWunsch {
                 }.start();
                 linhaAtual++;
             }
+//            Este try catch verifica se os Threads anteriores terminaram sua execução para liberar os próximos Threads
             try {
-                this.mutex[linhaAtual][this.string2.length() + 1].acquire();
-                this.mutex[linhaAtual][this.string2.length() + 1].release();
+                this.mutex[linhaAtual - 1][this.string2.length() - 1].acquire();
+                this.mutex[linhaAtual - 1][this.string2.length() - 1].release();
             } catch (InterruptedException ex) {
                 Logger.getLogger(NeedlemanWunsch.class.getName()).log(Level.SEVERE, null, ex);
             }
