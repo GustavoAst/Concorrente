@@ -44,6 +44,7 @@ public class NeedlemanWunsch {
         @Override
         public void run() {
             preencheMatriz(i);
+            ThreadSemaphoro.currentThread().stop();
         }
     }
 
@@ -66,6 +67,7 @@ public class NeedlemanWunsch {
         public void run() {
             try {
                 findSolution(i);
+                ThreadSolution.currentThread().stop();
             } catch (InterruptedException ex) {
                 Logger.getLogger(NeedlemanWunsch.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -182,16 +184,27 @@ public class NeedlemanWunsch {
             this.mutex[i][0] = new Semaphore(1);;
         }
 
+//        Semaphore teste[] = new Semaphore[100];
+//        for (int i = 0; i < teste.length + 1; i++) {
+//            teste[i] = new Semaphore(0);
+//        }
+
 //        inicializa o resto da matriz com new Semaphoro(0) pois não foram calculados ainda usando threads
-        for (int i = 1; i < this.string1.length() + 1; i++) { // for percorrendo as linhas da matriz
-            new ThreadSemaphoro(i) {
-            }.start();
+        int linhaAtual = 1;
+        while (linhaAtual < this.string1.length() + 1) {
+            if (this.mutex[linhaAtual - 1][this.string2.length() - 1] != null) {
+                for (int i = 0; i < this.threads; i++) { // for percorrendo as linhas da matriz
+                    new ThreadSemaphoro(linhaAtual) {
+                    }.start();
+                    linhaAtual++;
+                }
+            }
         }
 
-        int linhaAtual = 1;
+        linhaAtual = 1;
 
         while (linhaAtual < this.string1.length() + 1) {
-            for (int i = 1; i < this.threads; i++) {
+            for (int i = 0; i < this.threads; i++) {
                 if (linhaAtual == this.string1.length() + 1) {
                     break;
                 }
@@ -199,9 +212,15 @@ public class NeedlemanWunsch {
                 }.start();
                 linhaAtual++;
             }
+            try {
+                this.mutex[linhaAtual][this.string2.length() + 1].acquire();
+                this.mutex[linhaAtual][this.string2.length() + 1].release();
+            } catch (InterruptedException ex) {
+                Logger.getLogger(NeedlemanWunsch.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
 
-        this.score = this.solution[this.solution[0].length - 1][this.solution[0].length - 1];
+//        this.score = this.solution[this.solution[0].length - 1][this.solution[0].length - 1];
     }
 
     /**
@@ -270,7 +289,6 @@ public class NeedlemanWunsch {
      */
     public void printStrandInfo() {
         // Print out strand score
-        System.out.println("teste: " + solution[solution.length - 1][solution[0].length - 1]);
         System.out.println("The score for this alignment is: " + this.score);
     }
 
